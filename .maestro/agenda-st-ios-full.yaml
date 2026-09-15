@@ -1,0 +1,45 @@
+appId: br.gov.sp.bertioga.agendast
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Agenda ST Bertioga"
+    timeout: 30000
+- takeScreenshot: "build/screenshots/01-login"
+- tapOn: "E-mail"
+- inputText: ${TEST_EMAIL}
+- tapOn: "Senha"
+- inputText: ${TEST_PASSWORD}
+- hideKeyboard
+- tapOn: "Entrar"
+- extendedWaitUntil:
+    notVisible: "Entrar"
+    timeout: 30000
+- takeScreenshot: "build/screenshots/02-pos-login"
+- tapOn:
+    point: "7%,7%"
+- waitForAnimationToEnd
+- takeScreenshot: "build/screenshots/03-menu"
+- tapOn:
+    text: "Administração"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "build/screenshots/04-administracao"
+- tapOn:
+    point: "7%,7%"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Jornada"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "build/screenshots/05-jornada"
+- tapOn:
+    point: "7%,7%"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Agenda"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "build/screenshots/06-agenda"
