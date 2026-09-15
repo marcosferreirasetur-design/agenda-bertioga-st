@@ -1,0 +1,36 @@
+appId: br.gov.sp.bertioga.agendast
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible: "Agenda ST Bertioga"
+    timeout: 30000
+
+- takeScreenshot: "build/screenshots/01-login-inicial"
+
+- tapOn: "E-mail"
+- inputText: ${TEST_EMAIL}
+- tapOn: "Senha"
+- inputText: ${TEST_PASSWORD}
+- hideKeyboard
+
+- takeScreenshot: "build/screenshots/02-login-preenchido"
+
+- tapOn: "Entrar"
+
+# Não exige que a tela desapareça. O objetivo é registrar o resultado real.
+- extendedWaitUntil:
+    visible: "Agenda ST Bertioga"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: "build/screenshots/03-depois-de-entrar"
+
+# Dá tempo para Firebase/WKWebView concluir autenticação ou exibir erro.
+- extendedWaitUntil:
+    notVisible: "Entrar"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: "build/screenshots/04-estado-final-login"
