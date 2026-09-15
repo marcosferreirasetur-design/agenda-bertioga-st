@@ -216,3 +216,91 @@ workflows:
       - build/screenshots/*.png
       - build/simulator-udid.txt
       - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+
+  ios-login-simctl-diagnostic:
+    name: Agenda ST iOS - Login Screenshot Real
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      groups:
+        - agenda_st_test
+
+    scripts:
+      - name: Validar Secrets
+        script: |
+          set -e
+          test -n "${TEST_EMAIL:-}" || { echo "ERRO: TEST_EMAIL ausente."; exit 10; }
+          test -n "${TEST_PASSWORD:-}" || { echo "ERRO: TEST_PASSWORD ausente."; exit 11; }
+          echo "OK: Secrets recebidos."
+
+      - name: Build simulator
+        script: |
+          set -e
+          xcodebuild -project ios/AgendaSTBertioga.xcodeproj \
+            -scheme AgendaSTBertioga -configuration Debug \
+            -sdk iphonesimulator -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO clean build
+
+      - name: Boot e instalar
+        script: |
+          set -euo pipefail
+          mkdir -p build/screenshots
+          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9A-Fa-f-]{36}$/){print $i; exit}}')"
+          test -n "$UDID" || { echo "ERRO: simulador indisponivel."; exit 20; }
+          echo "$UDID" > build/simulator-udid.txt
+          xcrun simctl shutdown all >/dev/null 2>&1 || true
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+          xcrun simctl launch "$UDID" br.gov.sp.bertioga.agendast
+          sleep 15
+          xcrun simctl io "$UDID" screenshot build/screenshots/01-login-real.png
+
+      - name: Instalar Maestro
+        script: |
+          set -e
+          export MAESTRO_CLI_NO_ANALYTICS=1
+          curl -Ls https://get.maestro.mobile.dev | bash
+          "$HOME/.maestro/bin/maestro" --version
+
+      - name: Efetuar login
+        script: |
+          set -euo pipefail
+          export MAESTRO_CLI_NO_ANALYTICS=1
+          UDID="$(cat build/simulator-udid.txt)"
+
+          set +e
+          "$HOME/.maestro/bin/maestro" test \
+            -e TEST_EMAIL="$TEST_EMAIL" \
+            -e TEST_PASSWORD="$TEST_PASSWORD" \
+            .maestro/agenda-st-ios-login-simctl.yaml
+          MAESTRO_STATUS=$?
+          set -e
+
+          echo "Maestro status: $MAESTRO_STATUS"
+          sleep 3
+          xcrun simctl io "$UDID" screenshot build/screenshots/02-pos-entrar-3s.png
+          sleep 7
+          xcrun simctl io "$UDID" screenshot build/screenshots/03-pos-entrar-10s.png
+          sleep 15
+          xcrun simctl io "$UDID" screenshot build/screenshots/04-pos-entrar-25s.png
+
+          # O diagnóstico deve continuar mesmo se o Maestro reportar falha.
+          exit 0
+
+      - name: Conferir capturas reais
+        script: |
+          set -euo pipefail
+          echo "Capturas SIMCTL:"
+          find build/screenshots -type f -name '*.png' -print | sort
+          test -s build/screenshots/01-login-real.png
+          test -s build/screenshots/02-pos-entrar-3s.png
+          test -s build/screenshots/03-pos-entrar-10s.png
+          test -s build/screenshots/04-pos-entrar-25s.png
+          file build/screenshots/*.png
+
+    artifacts:
+      - build/screenshots/*.png
+      - build/simulator-udid.txt
+      - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app

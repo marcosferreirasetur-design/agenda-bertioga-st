@@ -1,0 +1,13 @@
+appId: br.gov.sp.bertioga.agendast
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Agenda ST Bertioga"
+    timeout: 30000
+- tapOn: "E-mail"
+- inputText: ${TEST_EMAIL}
+- tapOn: "Senha"
+- inputText: ${TEST_PASSWORD}
+- hideKeyboard
+- tapOn: "Entrar"
