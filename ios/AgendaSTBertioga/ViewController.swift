@@ -46,6 +46,10 @@ final class ViewController: UIViewController, WKNavigationDelegate {
         var request = URLRequest(url: components.url!)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         webView.load(request)
+#if DEBUG
+        // AGENDA_ST_DEBUG_LOGIN_CALL_V132
+        AgendaSTDebugWebLogin.run(on: webView)
+#endif
     }
 
     deinit {
