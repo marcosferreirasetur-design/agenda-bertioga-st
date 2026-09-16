@@ -663,3 +663,62 @@ workflows:
       - build/screenshots/*.png
       - build/logs/app.log
       - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+
+  ios-login-inline-v136:
+    name: Agenda ST iOS - Login Inline V136
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      groups:
+        - agenda_st_test
+    scripts:
+      - name: Validar Secrets
+        script: |
+          set -e
+          test -n "${TEST_EMAIL:-}" || exit 10
+          test -n "${TEST_PASSWORD:-}" || exit 11
+      - name: Build DEBUG
+        script: |
+          set -euo pipefail
+          mkdir -p build/logs
+          xcodebuild -project ios/AgendaSTBertioga.xcodeproj -scheme AgendaSTBertioga -configuration Debug -sdk iphonesimulator -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO clean build | tee build/logs/xcodebuild.log
+      - name: Provar codigo no binario
+        script: |
+          set -euo pipefail
+          BIN="build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app/AgendaSTBertioga"
+          test -f "$BIN"
+          strings "$BIN" | grep -q 'AGENDA_ST_V136_DIDFINISH' || { echo "ERRO marcador DIDFINISH ausente"; exit 20; }
+          strings "$BIN" | grep -q 'AGENDA_ST_V136_JS_RESULT' || { echo "ERRO marcador JS_RESULT ausente"; exit 21; }
+          echo "OK: V136 presente no binario."
+      - name: Executar simulador
+        script: |
+          set -euo pipefail
+          mkdir -p build/screenshots build/logs
+          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9A-Fa-f-]{36}$/){print $i; exit}}')"
+          test -n "$UDID"
+          echo "$UDID" > build/simulator-udid.txt
+          xcrun simctl shutdown all >/dev/null 2>&1 || true
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+          xcrun simctl spawn "$UDID" log stream --style compact --level debug --predicate 'process == "AgendaSTBertioga"' > build/logs/app.log 2>&1 &
+          LPID=$!
+          SIMCTL_CHILD_AGENDA_ST_UI_TEST=1 SIMCTL_CHILD_AGENDA_ST_TEST_EMAIL="$TEST_EMAIL" SIMCTL_CHILD_AGENDA_ST_TEST_PASSWORD="$TEST_PASSWORD" xcrun simctl launch --terminate-running-process "$UDID" br.gov.sp.bertioga.agendast
+          sleep 3; xcrun simctl io "$UDID" screenshot build/screenshots/01-3s.png
+          sleep 5; xcrun simctl io "$UDID" screenshot build/screenshots/02-8s.png
+          sleep 7; xcrun simctl io "$UDID" screenshot build/screenshots/03-15s.png
+          sleep 10; xcrun simctl io "$UDID" screenshot build/screenshots/04-25s.png
+          kill "$LPID" >/dev/null 2>&1 || true
+      - name: Resultado
+        script: |
+          set -e
+          grep 'AGENDA_ST_V136_DIDFINISH' build/logs/app.log || true
+          grep -E 'AGENDA_ST_V136_JS_(RESULT|ERROR)' build/logs/app.log || true
+          find build/screenshots -name '*.png' -print | sort
+          test -s build/screenshots/04-25s.png
+    artifacts:
+      - build/screenshots/*.png
+      - build/logs/*.log
+      - build/simulator-udid.txt
+      - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app

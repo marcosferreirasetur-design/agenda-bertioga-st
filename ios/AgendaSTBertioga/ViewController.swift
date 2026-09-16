@@ -47,14 +47,39 @@ final class ViewController: UIViewController, WKNavigationDelegate {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         webView.load(request)
     }
-
-    // AGENDA_ST_DEBUG_LOGIN_DIDFINISH_V135
-    private let agendaSTProbeV136 = "AGENDA_ST_BINARY_PROBE_V136_VIEWCONTROLLER"
+    // AGENDA_ST_LOGIN_INLINE_V136
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
 #if DEBUG
-        guard ProcessInfo.processInfo.environment["AGENDA_ST_UI_TEST"] == "1" else { return }
-        print("AGENDA_ST_V135_DIDFINISH:", webView.url?.absoluteString ?? "sem-url")
-        AgendaSTDebugWebLogin.run(on: webView)
+        let env = ProcessInfo.processInfo.environment
+        guard env["AGENDA_ST_UI_TEST"] == "1",
+              let email = env["AGENDA_ST_TEST_EMAIL"], !email.isEmpty,
+              let password = env["AGENDA_ST_TEST_PASSWORD"], !password.isEmpty else { return }
+        print("AGENDA_ST_V136_DIDFINISH:", webView.url?.absoluteString ?? "sem-url")
+        func jsLiteral(_ value: String) -> String {
+            let data = try! JSONSerialization.data(withJSONObject: [value])
+            let array = String(data: data, encoding: .utf8)!
+            return String(array.dropFirst().dropLast())
+        }
+        let javascript = """
+        (function(){
+          const email=\(jsLiteral(email)), password=\(jsLiteral(password));
+          const inputs=Array.from(document.querySelectorAll("input"));
+          const em=document.querySelector("input[type=email]") || inputs.find(x=>/e-?mail/i.test((x.placeholder||"")+" "+(x.name||"")+" "+(x.id||"")));
+          const pw=document.querySelector("input[type=password]") || inputs.find(x=>/senha|password/i.test((x.placeholder||"")+" "+(x.name||"")+" "+(x.id||"")));
+          function put(el,v){if(!el)return false;const proto=Object.getPrototypeOf(el),d=Object.getOwnPropertyDescriptor(proto,"value");if(d&&d.set)d.set.call(el,v);else el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));return true;}
+          const a=put(em,email), b=put(pw,password);
+          const btn=Array.from(document.querySelectorAll("button,input[type=submit]")).find(x=>/entrar/i.test((x.innerText||x.value||x.textContent||"").trim()));
+          const r={href:location.href,emailFound:!!em,passwordFound:!!pw,emailSet:a,passwordSet:b,buttonFound:!!btn};
+          if(a&&b&&btn){btn.click();r.action="clicked";} else if(a&&b&&pw&&pw.form){pw.form.requestSubmit?pw.form.requestSubmit():pw.form.submit();r.action="submitted";} else r.action="none";
+          return JSON.stringify(r);
+        })();
+        """
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            webView.evaluateJavaScript(javascript) { result, error in
+                if let error = error { print("AGENDA_ST_V136_JS_ERROR:", error.localizedDescription) }
+                else { print("AGENDA_ST_V136_JS_RESULT:", String(describing: result)) }
+            }
+        }
 #endif
     }
 
