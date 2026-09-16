@@ -600,3 +600,66 @@ workflows:
       - build/logs/app.log
       - build/simulator-udid.txt
       - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+
+  ios-binary-audit-v136:
+    name: Agenda ST iOS - Auditoria Binario V136
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      groups:
+        - agenda_st_test
+    scripts:
+      - name: Validar fontes
+        script: |
+          set -euo pipefail
+          mkdir -p build/auditoria build/screenshots build/logs
+          grep -RIn -E 'AGENDA_ST_(DEBUG_LOGIN_DIDFINISH_V135|DEBUG_JS_LOGIN_V132|BINARY_PROBE_V136)' ios | tee build/auditoria/01-marcadores-fonte.txt
+      - name: Build DEBUG auditado
+        script: |
+          set -o pipefail
+          xcodebuild -project ios/AgendaSTBertioga.xcodeproj -scheme AgendaSTBertioga -configuration Debug -sdk iphonesimulator -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO clean build 2>&1 | tee build/auditoria/02-xcodebuild.log
+      - name: Provar arquivos compilados
+        script: |
+          set -euo pipefail
+          grep -E 'ViewController\.swift|DebugWebLogin\.swift' build/auditoria/02-xcodebuild.log | tee build/auditoria/03-swift-compilado.txt || true
+          grep -q 'ViewController.swift' build/auditoria/02-xcodebuild.log || { echo "ERRO ViewController fora do build"; exit 20; }
+          grep -q 'DebugWebLogin.swift' build/auditoria/02-xcodebuild.log || { echo "ERRO DebugWebLogin fora do build"; exit 21; }
+      - name: Provar marcadores no binario
+        script: |
+          set -euo pipefail
+          BIN="build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app/AgendaSTBertioga"
+          test -f "$BIN"
+          strings "$BIN" > build/auditoria/04-binary-strings.txt
+          grep -Fq 'AGENDA_ST_BINARY_PROBE_V136_VIEWCONTROLLER' build/auditoria/04-binary-strings.txt || { echo "ERRO marcador ViewController ausente"; exit 30; }
+          grep -Fq 'AGENDA_ST_BINARY_PROBE_V136_DEBUGLOGIN' build/auditoria/04-binary-strings.txt || { echo "ERRO marcador DebugLogin ausente"; exit 31; }
+          shasum -a 256 "$BIN" | tee build/auditoria/05-sha256.txt
+          echo "OK: ambos os marcadores existem no binario."
+      - name: Executar binario auditado
+        script: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9A-Fa-f-]{36}$/){print $i; exit}}')"
+          test -n "$UDID"
+          xcrun simctl shutdown all >/dev/null 2>&1 || true
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          APP="build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app"
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl spawn "$UDID" log stream --style compact --level debug --predicate 'process == "AgendaSTBertioga"' > build/logs/app.log 2>&1 &
+          LPID=$!
+          SIMCTL_CHILD_AGENDA_ST_UI_TEST=1 SIMCTL_CHILD_AGENDA_ST_TEST_EMAIL="$TEST_EMAIL" SIMCTL_CHILD_AGENDA_ST_TEST_PASSWORD="$TEST_PASSWORD" xcrun simctl launch --terminate-running-process "$UDID" br.gov.sp.bertioga.agendast
+          sleep 5; xcrun simctl io "$UDID" screenshot build/screenshots/01-5s.png
+          sleep 8; xcrun simctl io "$UDID" screenshot build/screenshots/02-13s.png
+          sleep 12; xcrun simctl io "$UDID" screenshot build/screenshots/03-25s.png
+          kill "$LPID" >/dev/null 2>&1 || true
+      - name: Resultado runtime
+        script: |
+          set -e
+          grep -E 'AGENDA_ST_(V135_DIDFINISH|DEBUG_LOGIN_RESULT|DEBUG_LOGIN_ERROR)' build/logs/app.log | tee build/auditoria/06-runtime.txt || true
+          find build/screenshots -name '*.png' -print | sort
+          test -s build/screenshots/03-25s.png
+    artifacts:
+      - build/auditoria/*
+      - build/screenshots/*.png
+      - build/logs/app.log
+      - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app

@@ -2,6 +2,7 @@ import Foundation
 import WebKit
 #if DEBUG
 // AGENDA_ST_DEBUG_JS_LOGIN_V132
+private let agendaSTDebugProbeV136 = "AGENDA_ST_BINARY_PROBE_V136_DEBUGLOGIN"
 enum AgendaSTDebugWebLogin {
  static func run(on webView: WKWebView) {
   let env=ProcessInfo.processInfo.environment

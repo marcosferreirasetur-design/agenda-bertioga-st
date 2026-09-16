@@ -49,6 +49,7 @@ final class ViewController: UIViewController, WKNavigationDelegate {
     }
 
     // AGENDA_ST_DEBUG_LOGIN_DIDFINISH_V135
+    private let agendaSTProbeV136 = "AGENDA_ST_BINARY_PROBE_V136_VIEWCONTROLLER"
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
 #if DEBUG
         guard ProcessInfo.processInfo.environment["AGENDA_ST_UI_TEST"] == "1" else { return }
