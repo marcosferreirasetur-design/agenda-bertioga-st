@@ -46,8 +46,13 @@ final class ViewController: UIViewController, WKNavigationDelegate {
         var request = URLRequest(url: components.url!)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         webView.load(request)
+    }
+
+    // AGENDA_ST_DEBUG_LOGIN_DIDFINISH_V135
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
 #if DEBUG
-        // AGENDA_ST_DEBUG_LOGIN_CALL_V132
+        guard ProcessInfo.processInfo.environment["AGENDA_ST_UI_TEST"] == "1" else { return }
+        print("AGENDA_ST_V135_DIDFINISH:", webView.url?.absoluteString ?? "sem-url")
         AgendaSTDebugWebLogin.run(on: webView)
 #endif
     }
