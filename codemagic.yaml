@@ -531,3 +531,20 @@ workflows:
       - build/logs/app.log
       - build/simulator-udid.txt
       - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+
+  ios-source-structure-v134:
+    name: Agenda ST iOS - Estrutura Swift V134
+    instance_type: mac_mini_m2
+    max_build_duration: 15
+    environment:
+      xcode: latest
+    scripts:
+      - name: Extrair estrutura Swift
+        script: |
+          set -euo pipefail
+          mkdir -p build/diagnostico
+          grep -RIn --include='*.swift' -E 'class |WKWebView|WKNavigationDelegate|navigationDelegate|didFinish|\.load\(|agenda-externa-st\.web\.app' ios > build/diagnostico/estrutura-swift.txt || true
+          cp ios/AgendaSTBertioga/*.swift build/diagnostico/ 2>/dev/null || true
+          cat build/diagnostico/estrutura-swift.txt
+    artifacts:
+      - build/diagnostico/*
