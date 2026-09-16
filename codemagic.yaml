@@ -476,3 +476,58 @@ workflows:
       - build/screenshots/*.png
       - build/simulator-udid.txt
       - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+
+  ios-didfinish-v133:
+    name: Agenda ST iOS - Diagnostico didFinish V133
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      groups:
+        - agenda_st_test
+    scripts:
+      - name: Validar Secrets
+        script: |
+          set -e
+          test -n "${TEST_EMAIL:-}" || exit 10
+          test -n "${TEST_PASSWORD:-}" || exit 11
+      - name: Build DEBUG
+        script: |
+          set -e
+          xcodebuild -project ios/AgendaSTBertioga.xcodeproj -scheme AgendaSTBertioga -configuration Debug -sdk iphonesimulator -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO clean build
+      - name: Boot e capturar log
+        script: |
+          set -euo pipefail
+          mkdir -p build/screenshots build/logs
+          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9A-Fa-f-]{36}$/){print $i; exit}}')"
+          test -n "$UDID"
+          echo "$UDID" > build/simulator-udid.txt
+          xcrun simctl shutdown all >/dev/null 2>&1 || true
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
+          xcrun simctl spawn "$UDID" log stream --style compact --level debug --predicate 'process == "AgendaSTBertioga"' > build/logs/app.log 2>&1 &
+          LPID=$!
+          SIMCTL_CHILD_AGENDA_ST_UI_TEST=1 SIMCTL_CHILD_AGENDA_ST_TEST_EMAIL="$TEST_EMAIL" SIMCTL_CHILD_AGENDA_ST_TEST_PASSWORD="$TEST_PASSWORD" xcrun simctl launch --terminate-running-process "$UDID" br.gov.sp.bertioga.agendast
+          sleep 3
+          xcrun simctl io "$UDID" screenshot build/screenshots/01-3s.png
+          sleep 5
+          xcrun simctl io "$UDID" screenshot build/screenshots/02-8s.png
+          sleep 7
+          xcrun simctl io "$UDID" screenshot build/screenshots/03-15s.png
+          sleep 10
+          xcrun simctl io "$UDID" screenshot build/screenshots/04-25s.png
+          kill "$LPID" >/dev/null 2>&1 || true
+      - name: Conferir diagnostico
+        script: |
+          set -e
+          echo "=== MARCADORES LOGIN ==="
+          grep -E 'AGENDA_ST_DEBUG_LOGIN|WKWebView|didFinish' build/logs/app.log | tail -n 100 || true
+          echo "=== PNGS ==="
+          find build/screenshots -type f -name '*.png' -print | sort
+          test -s build/screenshots/04-25s.png
+    artifacts:
+      - build/screenshots/*.png
+      - build/logs/app.log
+      - build/simulator-udid.txt
+      - build/DerivedData/Build/Products/Debug-iphonesimulator/AgendaSTBertioga.app
