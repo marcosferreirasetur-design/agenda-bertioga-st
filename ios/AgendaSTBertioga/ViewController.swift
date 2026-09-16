@@ -49,7 +49,6 @@ final class ViewController: UIViewController, WKNavigationDelegate {
     }
     // AGENDA_ST_LOGIN_INLINE_V136
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-#if DEBUG
         let env = ProcessInfo.processInfo.environment
         guard env["AGENDA_ST_UI_TEST"] == "1",
               let email = env["AGENDA_ST_TEST_EMAIL"], !email.isEmpty,
@@ -80,7 +79,7 @@ final class ViewController: UIViewController, WKNavigationDelegate {
                 else { print("AGENDA_ST_V136_JS_RESULT:", String(describing: result)) }
             }
         }
-#endif
+
     }
 
     deinit {
